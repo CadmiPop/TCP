@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Specialized;
+using System.IO;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
@@ -27,58 +28,36 @@ namespace Client
                 string msg = Console.ReadLine();
                 if (msg == "exit")
                 {
-                    Disconnect(ns, client);
-                    clientThread.Interrupt();
+                    Disconnect(ns, client);                    
                     break;
-                }
-
+                }               
                 byte[] buffer = Encoding.ASCII.GetBytes(username + ": " + msg);
-
+                int messageLength = buffer.Length;
+                ns.Write(BitConverter.GetBytes(buffer.Length), 0, 4);
                 ns.Write(buffer, 0, buffer.Length);
                 ns.Flush();
-                
-                //byte[] receivedBytes = new byte[256];
-                //int byteCount = 0;
-                //string data = String.Empty;
-                //while (true)
-                //{
-                //    try
-                //    {
-                //        byteCount = ns.Read(receivedBytes, 0, receivedBytes.Length);
-                //        byte[] formated = new byte[byteCount];
-
-                //        Array.Copy(receivedBytes, formated, byteCount);
-                //        Array.Resize(ref formated, buffer.Length);
-                //        data = Encoding.ASCII.GetString(formated);
-                //    }
-                //    catch (Exception ex)
-                //    {
-                //        Console.WriteLine(ex.Message);
-                //    }
-                //    Console.WriteLine(data);
-                //}               
+                       
             }
         }
 
         private static void HandleClientComm(TcpClient client)
         {
             NetworkStream ns = client.GetStream();
-            byte[] Msg = new byte[256];
-            int bytesRead = 0;
+            byte[] Msg = new byte[254];
+            string str = String.Empty;
             while (true)
             {
                 try
                 {
-                    bytesRead = ns.Read(Msg, 0, Msg.Length);
+                    ProtocolWriteMessage(ns,out str);
                 }
-                catch (ObjectDisposedException ex)
+                catch (IOException)
                 {
-                    Console.WriteLine("gfg");
+                    break;
                 }
-                Array.Resize(ref Msg, bytesRead);
-                Console.WriteLine(Encoding.Default.GetString(Msg));
-            }
-            
+                
+                Console.WriteLine(str);
+            }          
         }
 
         private static TcpClient ConnectClient()
@@ -95,6 +74,25 @@ namespace Client
             client.Close();
         }
 
+        private static void ProtocolWriteMessage(NetworkStream ns, out string str)
+        {
+            var ms = new MemoryStream();
+
+            byte[] lengthBytes = new byte[4];
+            ns.Read(lengthBytes, 0, 4);
+            int length = BitConverter.ToInt32(lengthBytes);
+            byte[] buffer = new byte[8];
+
+            int numBytesRead;
+
+            while (ms.Length != length)
+            {
+                numBytesRead = ns.Read(buffer, 0, buffer.Length);
+                ms.Write(buffer, 0, numBytesRead);
+            }
+
+            str = Encoding.ASCII.GetString(ms.ToArray());
+        }
     }
 }
 

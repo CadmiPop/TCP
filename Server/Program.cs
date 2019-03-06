@@ -21,56 +21,79 @@ namespace Server
 
             while (true)
             {
-                TcpClient chatConnection = chatServer.AcceptTcpClient();
-                connectedClients.Add(chatConnection);
+                TcpClient chatConnectionClient = chatServer.AcceptTcpClient();
+                connectedClients.Add(chatConnectionClient);
 
-                Thread clientThread = new Thread(()=>HandleClientComm(chatConnection));
+                foreach (var clientOnline in connectedClients)
+                {
+                    if (!clientOnline.Connected)
+                        connectedClients.Remove(clientOnline);
+                }
+
+                Thread clientThread = new Thread(() => HandleClientComm(chatConnectionClient));
                 clientThread.Start();
+                
 
                 Console.WriteLine("Client Connected!!");
             }
 
             void HandleClientComm(TcpClient client)
             {
-                while (true)
-                {                  
-                    NetworkStream ns = client.GetStream();
 
+                while (true)
+                {
+                    NetworkStream ns = client.GetStream();
+                    string str = String.Empty;
                     byte[] Msg = new byte[256];
-                    int bytesRead = 0;
+
                     try
                     {
-                        bytesRead = ns.Read(Msg, 0, Msg.Length);
+                        ProtocolWriteMessage(ns, out str);
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine(ex.Message);
+                        connectedClients.Remove(client);
+                        return;
                     }
-                    Array.Resize(ref Msg, bytesRead);
 
-                    Console.WriteLine(Encoding.Default.GetString(Msg));
+                    Console.WriteLine(str);
+                    Msg = Encoding.Default.GetBytes(str);
 
-                    foreach (var clientOnline in connectedClients)
-                    {
-                        NetworkStream nS = clientOnline.GetStream();
-                        nS.Write(Msg, 0, Msg.Length);
-                        nS.Flush();                       
-                    }                   
-                }  
+                    Broadcast(connectedClients, Msg);
+                }
+            }            
+        }
+
+        private static void Broadcast(List<TcpClient> connectedClients, byte[] Msg)
+        {
+            foreach (var clientOnline in connectedClients)
+            {
+                NetworkStream nS = clientOnline.GetStream();
+                nS.Write(BitConverter.GetBytes(Msg.Length), 0, 4);
+                nS.Write(Msg, 0, Msg.Length);
+                nS.Flush();
             }
         }
 
-
-        private static void ProtocolWritekMessage(string message, TcpClient client)
+        private static void ProtocolWriteMessage(NetworkStream ns,out string str)
         {
-            NetworkStream networkStream = client.GetStream();
+            var ms = new MemoryStream();
+            
+            byte[] lengthBytes = new byte[4];       
+            ns.Read(lengthBytes, 0, 4);
 
-            byte[] messageBytes = Encoding.ASCII.GetBytes(message); 
-            int length = messageBytes.Length;
-            byte[] lengthBytes = System.BitConverter.GetBytes(length);
+            int length = BitConverter.ToInt32(lengthBytes);
+            byte[] buffer = new byte[8];
 
-            networkStream.Write(lengthBytes, 0, lengthBytes.Length);
-            networkStream.Write(messageBytes, 0, length);
+            int numBytesRead;
+
+            while (ms.Length != length) 
+            {
+                numBytesRead = ns.Read(buffer, 0, buffer.Length);
+                ms.Write(buffer, 0, numBytesRead);
+            }
+            
+            str = Encoding.ASCII.GetString(ms.ToArray());
         }
     }
 }
