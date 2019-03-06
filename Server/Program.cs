@@ -11,7 +11,7 @@ using System.Text;
 
 namespace Server
 {
-    class Prgram
+    class Program
     {
         static void Main(string[] args)
         {
@@ -24,22 +24,20 @@ namespace Server
                 TcpClient chatConnection = chatServer.AcceptTcpClient();
                 connectedClients.Add(chatConnection);
 
-                Thread clientThread = new Thread(HandleClientComm);
-                clientThread.Start(chatConnection);
+                Thread clientThread = new Thread(()=>HandleClientComm(chatConnection));
+                clientThread.Start();
 
                 Console.WriteLine("Client Connected!!");
             }
 
-            void HandleClientComm(object client)
+            void HandleClientComm(TcpClient client)
             {
                 while (true)
-                {
-                    TcpClient tcpClient = (TcpClient)client;
-                    NetworkStream ns = tcpClient.GetStream();
+                {                  
+                    NetworkStream ns = client.GetStream();
 
                     byte[] Msg = new byte[256];
                     int bytesRead = 0;
-
                     try
                     {
                         bytesRead = ns.Read(Msg, 0, Msg.Length);
@@ -52,24 +50,27 @@ namespace Server
 
                     Console.WriteLine(Encoding.Default.GetString(Msg));
 
-                    foreach (var a in connectedClients)
+                    foreach (var clientOnline in connectedClients)
                     {
-                        ns.Write(Msg, 0, Msg.Length);
-                        ns.Flush();
-                    }
-                    
+                        NetworkStream nS = clientOnline.GetStream();
+                        nS.Write(Msg, 0, Msg.Length);
+                        nS.Flush();                       
+                    }                   
                 }  
             }
         }
 
 
-        private static void WriteToAllClients(NetworkStream ns)
+        private static void ProtocolWritekMessage(string message, TcpClient client)
         {
-            byte[] newMsg = new byte[256];
-            int a = ns.Read(newMsg, 0, newMsg.Length);
-            Array.Resize(ref newMsg, a);
-            Console.WriteLine(Encoding.Default.GetString(newMsg));
-            ns.Write(newMsg, 0, newMsg.Length);
+            NetworkStream networkStream = client.GetStream();
+
+            byte[] messageBytes = Encoding.ASCII.GetBytes(message); 
+            int length = messageBytes.Length;
+            byte[] lengthBytes = System.BitConverter.GetBytes(length);
+
+            networkStream.Write(lengthBytes, 0, lengthBytes.Length);
+            networkStream.Write(messageBytes, 0, length);
         }
     }
 }
