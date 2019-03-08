@@ -22,18 +22,24 @@ namespace Client
 
             while (client.Connected)
             {
-                Console.WriteLine("Send Message:");
                 NetworkStream ns = client.GetStream();
                 
                 string msg = Console.ReadLine();
+                ClearLastLine();
                 if (msg == "exit")
                 {
                     Disconnect(ns, client);                    
                     break;
                 }               
                 byte[] buffer = Encoding.ASCII.GetBytes(username + ": " + msg);
+
+                if (buffer.Length > 255)
+                {
+                    Console.WriteLine("Text can't be bigger then 255 chars!");
+                    break;
+                }
                 
-                ns.Write(BitConverter.GetBytes(buffer.Length), 0, 4);
+                ns.Write(BitConverter.GetBytes(buffer.Length), 0, 1);
                 ns.Write(buffer, 0, buffer.Length);
                 ns.Flush();
                        
@@ -77,21 +83,23 @@ namespace Client
         private static void ProtocolWriteMessage(NetworkStream ns, out string str)
         {
             var ms = new MemoryStream();
-
-            byte[] lengthBytes = new byte[4];
-            ns.Read(lengthBytes, 0, 4);
-            int length = BitConverter.ToInt32(lengthBytes);
-            byte[] buffer = new byte[8];
-
-            int numBytesRead;
+            byte[] buffer = new byte[1];
+            ns.Read(buffer, 0, 1);
+            int length = buffer[0];
 
             while (ms.Length != length)
-            {
-                numBytesRead = ns.Read(buffer, 0, buffer.Length);
-                ms.Write(buffer, 0, numBytesRead);
+            {               
+                ms.Write(buffer, 0, ns.Read(buffer, 0, buffer.Length));
             }
 
             str = Encoding.ASCII.GetString(ms.ToArray());
+        }
+
+        public static void ClearLastLine()
+        {
+            Console.SetCursorPosition(0, Console.CursorTop - 1);
+            Console.Write(new string(' ', Console.BufferWidth));
+            Console.SetCursorPosition(0, Console.CursorTop - 1);
         }
     }
 }

@@ -24,11 +24,8 @@ namespace Server
                 TcpClient chatConnectionClient = chatServer.AcceptTcpClient();
                 connectedClients.Add(chatConnectionClient);
 
-
-
                 Thread clientThread = new Thread(() => HandleClientComm(chatConnectionClient));
                 clientThread.Start();
-                
 
                 Console.WriteLine("Client Connected!!");
             }
@@ -56,12 +53,13 @@ namespace Server
                         for (int i = 0; i < connectedClients.Count; i++)
                         {
                             if (connectedClients[i].Connected == false)
+                            {
                                 connectedClients.Remove(connectedClients[i]);
+                                Console.WriteLine("Client Disconnected!!");
+                            }  
                         }
                         return;
                     }
-
-                   
                 }
             }            
         }
@@ -71,7 +69,7 @@ namespace Server
             foreach (var clientOnline in connectedClients)
             {
                 NetworkStream nS = clientOnline.GetStream();
-                nS.Write(BitConverter.GetBytes(Msg.Length), 0, 4);
+                nS.Write(BitConverter.GetBytes(Msg.Length), 0, 1);
                 nS.Write(Msg, 0, Msg.Length);
                 nS.Flush();
             }
@@ -80,17 +78,13 @@ namespace Server
         private static void ProtocolWriteMessage(NetworkStream ns,out string str)
         {
             var ms = new MemoryStream();
-            byte[] lengthBytes = new byte[4];
-            ns.Read(lengthBytes, 0, 4);
-            int length = BitConverter.ToInt32(lengthBytes);
-            byte[] buffer = new byte[8];
-
-            int numBytesRead;
+            byte[] buffer = new byte[1];
+            ns.Read(buffer, 0, 1);
+            int length = buffer[0];
 
             while (ms.Length != length)
             {
-                numBytesRead = ns.Read(buffer, 0, buffer.Length);
-                ms.Write(buffer, 0, numBytesRead);
+                ms.Write(buffer, 0, ns.Read(buffer, 0, buffer.Length));
             }
 
             str = Encoding.ASCII.GetString(ms.ToArray());
