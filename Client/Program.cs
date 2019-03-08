@@ -32,7 +32,7 @@ namespace Client
                     break;
                 }               
                 byte[] buffer = Encoding.ASCII.GetBytes(username + ": " + msg);
-                int messageLength = buffer.Length;
+                
                 ns.Write(BitConverter.GetBytes(buffer.Length), 0, 4);
                 ns.Write(buffer, 0, buffer.Length);
                 ns.Flush();
@@ -43,7 +43,7 @@ namespace Client
         private static void HandleClientComm(TcpClient client)
         {
             NetworkStream ns = client.GetStream();
-            byte[] Msg = new byte[254];
+            byte[] Msg = new byte[255];
             string str = String.Empty;
             while (true)
             {
@@ -51,9 +51,9 @@ namespace Client
                 {
                     ProtocolWriteMessage(ns,out str);
                 }
-                catch (IOException)
+                catch (Exception)
                 {
-                    break;
+                    return;
                 }
                 
                 Console.WriteLine(str);

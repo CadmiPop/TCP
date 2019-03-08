@@ -24,11 +24,7 @@ namespace Server
                 TcpClient chatConnectionClient = chatServer.AcceptTcpClient();
                 connectedClients.Add(chatConnectionClient);
 
-                foreach (var clientOnline in connectedClients)
-                {
-                    if (!clientOnline.Connected)
-                        connectedClients.Remove(clientOnline);
-                }
+
 
                 Thread clientThread = new Thread(() => HandleClientComm(chatConnectionClient));
                 clientThread.Start();
@@ -44,22 +40,28 @@ namespace Server
                 {
                     NetworkStream ns = client.GetStream();
                     string str = String.Empty;
-                    byte[] Msg = new byte[256];
+                    byte[] Msg = new byte[255];
 
                     try
-                    {
+                    {                       
                         ProtocolWriteMessage(ns, out str);
+
+                        Console.WriteLine(str);
+                        Msg = Encoding.Default.GetBytes(str);
+
+                        Broadcast(connectedClients, Msg);
                     }
-                    catch (Exception ex)
+                    catch (IOException ex)
                     {
-                        connectedClients.Remove(client);
+                        for (int i = 0; i < connectedClients.Count; i++)
+                        {
+                            if (connectedClients[i].Connected == false)
+                                connectedClients.Remove(connectedClients[i]);
+                        }
                         return;
                     }
 
-                    Console.WriteLine(str);
-                    Msg = Encoding.Default.GetBytes(str);
-
-                    Broadcast(connectedClients, Msg);
+                   
                 }
             }            
         }
@@ -78,21 +80,19 @@ namespace Server
         private static void ProtocolWriteMessage(NetworkStream ns,out string str)
         {
             var ms = new MemoryStream();
-            
-            byte[] lengthBytes = new byte[4];       
+            byte[] lengthBytes = new byte[4];
             ns.Read(lengthBytes, 0, 4);
-
             int length = BitConverter.ToInt32(lengthBytes);
             byte[] buffer = new byte[8];
 
             int numBytesRead;
 
-            while (ms.Length != length) 
+            while (ms.Length != length)
             {
                 numBytesRead = ns.Read(buffer, 0, buffer.Length);
                 ms.Write(buffer, 0, numBytesRead);
             }
-            
+
             str = Encoding.ASCII.GetString(ms.ToArray());
         }
     }
